@@ -1,39 +1,29 @@
+import { FlashList } from "@shopify/flash-list";
 import { useFocusEffect, useGlobalSearchParams, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Dimensions, FlatList, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Dimensions, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
+  FadeInLeft,
+  FadeInRight,
+  FadeOutRight,
+  LinearTransition,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScaledSheet, moderateScale } from 'react-native-size-matters';
-import { CountAll, CountStatusByName, DataGPS, ItemTypeGPSData } from '../../data/GPSData';
+import { CountAllByName, CountStatusByName, DataGPS, ItemTypeGPSData } from '../../data/GPSData';
 import { darkenHexColor } from '../CustomLibrary/ColorDarker';
 import RandyIcon, { RandyBatteryIcon } from '../CustomLibrary/CustomIcon';
-import CustomFlatList from '../CustomLibrary/CustomList';
+import CustomFlashList from '../CustomLibrary/CustomList';
 import RandySpeedometer from '../CustomLibrary/RandySpeedometer';
 import RandyStateData from '../CustomLibrary/RandyVehicleState';
 
 const { height, width } = Dimensions.get('window');
 const router = useRouter();
-function GPSItem({ isSelected, children }: { isSelected: boolean; children: React.ReactNode }) {
-  const rotate = useSharedValue('0deg');
-
-  React.useEffect(() => {
-    rotate.value = isSelected ? withSpring('90deg') : withSpring('0deg');
-  }, [isSelected]);
-
-  const rotateArrow = useAnimatedStyle(() => ({
-    transform: [{ rotate: rotate.value }],
-  }));
-
-  return (
-    <Animated.View style={rotateArrow}>
-      {children}
-    </Animated.View>
-  );
-}
 
 export default function GPS() {
 
@@ -48,10 +38,36 @@ export default function GPS() {
   const [choosenStateIndex, setChoosenStateIndex] = useState(0);
   const [DeactivatedState, setDeactivatedState] = useState(true);
   const [Animate, setAnimate] = useState<number | null>(null);
-  const [BugAnimate, setBugAnimate] = useState<number | null>(null);
+  const [BugAnimate, setBugAnimate] = useState(false);
+  const [BugAnimate2, setBugAnimate2] = useState<number>(0);
   const [dataGPSState, setDataGPSState] = useState<ItemTypeGPSData[]>(DataGPS);
   const inputRef = useRef<TextInput>(null);
-  const rotate = useSharedValue<string>('0deg');
+  const rotate = useSharedValue<number>(0);
+  const rotated = useSharedValue<number>(0);
+  const rotate2 = useSharedValue<number>(0);
+  const rotated2 = useSharedValue<number>(0);
+  const [Rotation, setRotation] = useState<number>(0);
+  const [Rotation2, setRotation2] = useState<number>(0);
+
+  const setter = (rotateVal: number, rotatedVal: number) => {
+    if (rotatedVal === 90 && rotateVal === 0) {
+      setBugAnimate(true);
+    } else {
+      setBugAnimate(false);
+      setBugAnimate2(0);
+    }
+  };
+
+  useAnimatedReaction(
+    () => [rotate.value, rotated.value],
+    ([currentRotate, currentRotated], prev) => {
+      const [prevRotate, prevRotated] = prev ?? [undefined, undefined];
+      if (currentRotate !== prevRotate || currentRotated !== prevRotated) {
+        runOnJS(setter)(currentRotate, currentRotated);
+      }
+    },
+    [rotate, rotated]
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -82,17 +98,49 @@ export default function GPS() {
   }, [searchActive]);
 
   useEffect(() => {
-    rotate.value = selectedIndex !== null ? '90deg' : '0deg';
+    if (selectedIndex === null) {
+      rotate.value = 0;
+      rotate2.value = 0;
+    } else if (selectedIndex !== null) {
+      rotate.value = 90;
+      rotate2.value = 90;
+    }
   }, [selectedIndex]);
+
+  useEffect(() => {
+    if (Animate && selectedIndex !== null) {
+      rotate.value = 0;
+      rotated.value = 90;
+      rotate2.value = 0;
+      rotated2.value = 90;
+    } else {
+      rotated.value = 0;
+      rotated2.value = 0;
+    }
+
+    if ((BugAnimate) && (BugAnimate2 <= 3)) {
+      rotate2.value === 0 ? rotate2.value = 90 : rotate2.value = 0;
+      rotated2.value === 0 ? rotated2.value = 90 : rotated2.value = 0;
+      setBugAnimate2(BugAnimate2 + 1);
+    } else if (BugAnimate2 > 3){
+      rotate2.value === 0 ? rotate2.value = 90 : rotate2.value = 0;
+      rotated2.value === 0 ? rotated2.value = 90 : rotated2.value = 0;
+      setBugAnimate2(1);
+    }
+  }, [selectedIndex]);
+
+  //   useEffect(() => {
+  //   if ((rotated.value === 90) && (rotate.value === 0)) {
+  //     setBugAnimate(true);
+  //   } else if ((rotated.value === 0) && (rotate.value === 0)) {
+  //     setBugAnimate(false);
+  //   }
+  // }, [selectedIndex]);
 
   const renderItemMemo = useMemo(() => {
     return (item: ItemTypeGPSData, isSelected: boolean, index: number) => renderGPSKendaraan(item, isSelected, index);
   }, [dataGPSState, selectedIndex]);
 
-  const filteredData = useMemo(
-    () => filterGPSData(dataGPSState, searchText, UsersSearchText),
-    [dataGPSState, searchText, UsersSearchText]
-  );
   {/********** HOOKS **********/ }
 
   {/********** FUNGSI LAIN - LAIN **********/ }
@@ -122,8 +170,7 @@ export default function GPS() {
 
   const handleSelectItem = (index: number) => {
     setSelectedIndex(selectedIndex === index ? null : index);
-    setAnimate(selectedIndex);
-    setBugAnimate(Animate);
+    setAnimate(selectedIndex === 0 ? -20 : selectedIndex);
   };
 
   const handleDebugPress = () => {
@@ -148,7 +195,27 @@ export default function GPS() {
     setDataGPSState(updatedData);
   };
 
-  function filterGPSData(data: ItemTypeGPSData[], filter: string, search: string) {
+  const rotateArrow = useAnimatedStyle(() => ({
+    transform: [{ rotate: withSpring(`${rotate.value}deg`) }],
+  }));
+
+  const rotatedArrow = useAnimatedStyle(() => ({
+    transform: [{ rotate: withSpring(`${rotated.value}deg`) }],
+  }));
+
+  const rotateArrow2 = useAnimatedStyle(() => ({
+    transform: [{ rotate: withSpring(`${rotate2.value}deg`) }],
+  }));
+
+  const rotatedArrow2 = useAnimatedStyle(() => ({
+    transform: [{ rotate: withSpring(`${rotated2.value}deg`) }],
+  }));
+
+  {/********** FUNGSI LAIN - LAIN **********/ }
+
+  {/********** FUNGSI FILTERING **********/ }
+
+  function filterGPSData(data: ItemTypeGPSData[], filter: string, search: string, UsersSearchText: string) {
     let filtered = data;
 
     if (UsersSearchText && UsersSearchText.trim() !== '') {
@@ -156,6 +223,19 @@ export default function GPS() {
         user.user.toLowerCase() === UsersSearchText.toLowerCase()
       );
     }
+    if (search && search.trim() !== '') {
+      const searchLower = search.toLowerCase();
+      filtered = filtered
+        .map(user => ({
+          ...user,
+          userGPS: user.userGPS?.filter(gps =>
+            user.user.toLowerCase().includes(searchLower) ||
+            gps.nopol.toLowerCase().includes(searchLower)
+          )
+        }))
+        .filter(user => user.userGPS && user.userGPS.length > 0);
+    }
+
 
     if (filter !== 'All') {
       filtered = filtered
@@ -170,266 +250,248 @@ export default function GPS() {
         }))
         .filter(user => user.userGPS && user.userGPS.length > 0);
     }
-    if (search && search.trim() !== '') {
-      const searchLower = search.toLowerCase();
-      filtered = filtered
-        .map(user => ({
-          ...user,
-          userGPS: user.userGPS?.filter(gps =>
-            user.user.toLowerCase().includes(searchLower) ||
-            gps.nopol.toLowerCase().includes(searchLower)
-          )
-        }))
-        .filter(user => user.userGPS && user.userGPS.length > 0);
-    }
+
     return filtered;
   }
 
-  function filterVehicleStateValue(data: ItemTypeGPSData[], search: string) {
-    let filtered = data;
-
-    if (UsersSearchText && UsersSearchText.trim() !== '') {
-      filtered = filtered.filter(user =>
-        user.user.toLowerCase() === UsersSearchText.toLowerCase()
-      );
-    }
-
-    if (search && search.trim() !== '') {
-      const searchLower = search.toLowerCase();
-      filtered = filtered
-        .map(user => ({
-          ...user,
-          userGPS: user.userGPS?.filter(gps =>
-            user.user.toLowerCase().includes(searchLower) ||
-            gps.nopol.toLowerCase().includes(searchLower)
-          )
-        }))
-        .filter(user => user.userGPS && user.userGPS.length > 0);
-    }
-    return filtered;
-  }
+  // const VehicleStatusData = useMemo(() => {
+  //   const arr = [
+  //     { name: 'On', value: CountStatusByName(dataGPSState, 'On', UsersSearchText), color: '#6ac66dff' },
+  //     { name: 'Off', value: CountStatusByName(dataGPSState, 'Off', UsersSearchText), color: '#cb574fff' },
+  //     { name: 'Move', value: CountStatusByName(dataGPSState, 'Move', UsersSearchText), color: '#A0D9E7' },
+  //     { name: 'Park', value: CountStatusByName(dataGPSState, 'Park', UsersSearchText), color: '#4A4B4D' },
+  //     { name: 'Rent', value: CountStatusByName(dataGPSState, 'Rent', UsersSearchText), color: '#2d758bff' },
+  //   ];
+  //   if (!UsersSearchText || UsersSearchText.trim() === '') {
+  //     arr.unshift({ name: 'All', value: CountAll(dataGPSState), color: '#78C7DC' });
+  //   }
+  //   return arr;
+  // }, [dataGPSState, UsersSearchText]);
 
   const VehicleStatusData = useMemo(() => {
     const arr = [
+      { name: 'All', value: CountAllByName(dataGPSState, UsersSearchText), color: '#78C7DC' },
       { name: 'On', value: CountStatusByName(dataGPSState, 'On', UsersSearchText), color: '#6ac66dff' },
       { name: 'Off', value: CountStatusByName(dataGPSState, 'Off', UsersSearchText), color: '#cb574fff' },
       { name: 'Move', value: CountStatusByName(dataGPSState, 'Move', UsersSearchText), color: '#A0D9E7' },
       { name: 'Park', value: CountStatusByName(dataGPSState, 'Park', UsersSearchText), color: '#4A4B4D' },
       { name: 'Rent', value: CountStatusByName(dataGPSState, 'Rent', UsersSearchText), color: '#2d758bff' },
     ];
-    if (!UsersSearchText || UsersSearchText.trim() === '') {
-      arr.unshift({ name: 'All', value: CountAll(dataGPSState), color: '#78C7DC' });
-    }
     return arr;
   }, [dataGPSState, UsersSearchText]);
 
   const VehicleStatusFiltered = VehicleStatusData[choosenStateIndex]?.name;
-  {/********** FUNGSI LAIN - LAIN **********/ }
+
+  const filteredData = useMemo(
+    () => filterGPSData(dataGPSState, VehicleStatusFiltered, searchText, UsersSearchText),
+    [dataGPSState, VehicleStatusFiltered, searchText, UsersSearchText]
+  );
+  {/********** FUNGSI FILTERING **********/ }
 
   {/********** RENDER ITEM FLATLIST **********/ }
-  const renderGPSKendaraan = (item: ItemTypeGPSData, isSelected: boolean, index: number) => (
-    <View style={{ marginVertical: moderateScale(20) }}>
-      <View style={{}}>
-        <TouchableOpacity onPress={() => handleSelectItem(index)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: moderateScale(16), alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{
-                backgroundColor: '#78C7DC',
-                borderRadius: '100%', width: moderateScale(32),
-                height: moderateScale(32), alignItems: 'center',
-                justifyContent: 'center', marginRight: moderateScale(8),
-                borderLeftWidth: 3,
-                borderLeftColor: (darkenHexColor('#78C7DC', 0.8, 0.93)),
-                shadowColor: "#000",
-                borderRightWidth: 3,
-                borderRightColor: '#78C7DC',
-                shadowOffset: {
-                  width: 0,
-                  height: 1,
-                },
-                shadowOpacity: 0.1,
-                shadowRadius: 2,
-                elevation: 2,
-              }}>
-                <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 14, top: moderateScale(2), color: '#fff' }}>{item.userGPS ? item.userGPS.length : 0}</Text>
-              </View>
-              <View style={{ backgroundColor: '#ffffffff', borderRadius: '100%', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(8) }}>
-                <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 14, top: moderateScale(2) }}>{item.user}</Text>
+  const renderGPSKendaraan = (item: ItemTypeGPSData, isSelected: boolean, index: number) => {
+    return (
+      <View style={{ marginVertical: moderateScale(20) }}>
+        <View style={{}}>
+          <TouchableOpacity onPress={() => [handleSelectItem(index)]} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: moderateScale(16), alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  backgroundColor: '#78C7DC',
+                  borderRadius: '100%', width: moderateScale(32),
+                  height: moderateScale(32), alignItems: 'center',
+                  justifyContent: 'center', marginRight: moderateScale(8),
+                  borderLeftWidth: 3,
+                  borderLeftColor: (darkenHexColor('#78C7DC', 0.8, 0.93)),
+                  shadowColor: "#000",
+                  borderRightWidth: 3,
+                  borderRightColor: '#78C7DC',
+                  shadowOffset: {
+                    width: 0,
+                    height: 1,
+                  },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 2,
+                  elevation: 2,
+                }}>
+                  <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 14, top: moderateScale(2), color: '#fff' }}>{item.userGPS ? item.userGPS.length : 0}</Text>
+                </View>
+                <View style={{ backgroundColor: '#ffffffff', borderRadius: '100%', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(8) }}>
+                  <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 14, top: moderateScale(2) }}>{item.user}</Text>
+                </View>
               </View>
             </View>
-          </View>
-          <GPSItem isSelected={isSelected}>
-            <RandyIcon name="ArrowRight" color="#4A4B4D" size={moderateScale(24)} />
-          </GPSItem>
-        </TouchableOpacity>
-        {isSelected ? (
-          <View style={{ marginTop: moderateScale(16), marginHorizontal: moderateScale(12), marginBottom: (index === dataGPSState.length - 1) ? moderateScale(20) : 0 }}>
-            {item.userGPS && (
-              <FlatList
-                data={item.userGPS}
-                keyExtractor={(_, idx) => idx.toString()}
-                renderItem={({ item: gps, index: idx }) => (
-                  <View
-                    key={idx}
-                    style={{
-                      backgroundColor: '#f6fafd',
-                      borderRadius: moderateScale(8),
-                      padding: moderateScale(10),
-                      marginBottom: moderateScale(8),
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      elevation: 1,
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row' }}>
-                          <View
-                            style={[
-                              styles.vehicleStatus,
-                              {
-                                backgroundColor: getColorFromSubstate(gps.substate, gps.state),
-                                borderLeftColor: darkenHexColor(getColorFromSubstate(gps.substate, gps.state) ?? '#F44336', 0.8, 0.93),
-                              },
-                            ]}
-                          >
+            <Animated.View style={((BugAnimate2 > 3 ) && (BugAnimate2 %2 === 0) && (isSelected === true) && (index === selectedIndex))? rotateArrow2 :((BugAnimate2 > 2 ) && (BugAnimate2 %2 === 0) && (isSelected === false) && (index === Animate))? rotatedArrow2 : ((BugAnimate2 > 2 ) && (BugAnimate2 %2 === 0) && (isSelected === true) && (index === selectedIndex))? rotatedArrow2 :((BugAnimate2 > 2 ) && (BugAnimate2 %2 !== 0) && (isSelected === false) && (index === selectedIndex))? rotateArrow2 :((BugAnimate2 > 1 ) && (BugAnimate2 %2 == 0) && (isSelected === true) && (index === selectedIndex))? rotateArrow2 : ((BugAnimate2 > 0) && (isSelected === true) && (index === selectedIndex)) ? rotatedArrow2 : ((BugAnimate2 === 2)&& (isSelected === false) && (index === Animate)) ? rotatedArrow2 : ((BugAnimate2 > 0) && (isSelected === false) && (index === Animate) ) ?  rotateArrow2 : ((BugAnimate) && (isSelected) && (index === selectedIndex)) ? rotateArrow2 : (isSelected && (Animate && selectedIndex !== null)) ? rotatedArrow : (BugAnimate && (index === Animate)) ? rotatedArrow2 : selectedIndex === index ? rotateArrow : Animate === index ? rotateArrow : undefined}>
+              <RandyIcon name="ArrowRight" color="#4A4B4D" size={moderateScale(24)} />
+            </Animated.View>
+          </TouchableOpacity>
+          {isSelected ? (
+            <View style={{ marginTop: moderateScale(16), marginHorizontal: moderateScale(12), marginBottom: (index === dataGPSState.length - 1) ? moderateScale(20) : 0 }}>
+              {item.userGPS && (
+                <FlashList
+                  data={item.userGPS}
+                  keyExtractor={(_, idx) => idx.toString()}
+                  renderItem={({ item: gps, index: idx }) => (
+                    <Animated.View
+                      entering={FadeInLeft}
+                      layout={LinearTransition.springify().damping(16)}
+                      style={{
+                        backgroundColor: '#f6fafd',
+                        borderRadius: moderateScale(8),
+                        padding: moderateScale(10),
+                        marginBottom: moderateScale(8),
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        elevation: 1,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <View style={{ flexDirection: 'row' }}>
                             <View
                               style={[
-                                styles.colorIndicator,
-                                { backgroundColor: darkenHexColor(getColorFromSubstate(gps.substate, gps.state) ?? '#F44336', 0.8, 0.93) },
+                                styles.vehicleStatus,
+                                {
+                                  backgroundColor: getColorFromSubstate(gps.substate, gps.state),
+                                  borderLeftColor: darkenHexColor(getColorFromSubstate(gps.substate, gps.state) ?? '#F44336', 0.8, 0.93),
+                                },
                               ]}
-                            />
-                            <Text
-                              style={{
-                                fontFamily: 'Poppins-SemiBold',
-                                fontSize: 12,
-                                top: moderateScale(2),
-                                color: '#ffffffff',
-                              }}
                             >
-                              {gps.state === 'On' ? gps.substate : gps.state}
-                            </Text>
-                          </View>
-                          <View
-                            style={[
-                              styles.vehiclePlate,
-                              {
-                                borderLeftColor: darkenHexColor(getColorFromSubstate(gps.substate, gps.state) ?? '#F44336', 0.8, 0.93),
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={{
-                                fontFamily: 'Poppins-SemiBold',
-                                fontSize: 12,
-                                top: moderateScale(2),
-                                color: '#4A4B4D',
-                              }}
-                            >
-                              {gps.nopol}
-                            </Text>
-                          </View>
-                        </View>
-                        <View>
-                          <View style={{ flexDirection: 'row' }}>
-                            <View style={{ marginBottom: moderateScale(12), alignSelf: 'center' }}>
-                              <RandyBatteryIcon color="#4A4B4D" size={moderateScale(24)} percentage={gps.batteryLevel} />
-                            </View>
-                            <TouchableOpacity style={{ marginBottom: moderateScale(12) }}>
-                              <RandyIcon name="StreetView" color="#4A4B4D" size={moderateScale(28)} />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={{ marginBottom: moderateScale(12) }}>
-                              <RandyIcon name="Edit" color="#4A4B4D" size={moderateScale(28)} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                      <Text
-                        style={{
-                          fontFamily: 'Poppins-SemiBold',
-                          fontSize: 12,
-                          color: '#4A4B4D',
-                          paddingLeft: moderateScale(8),
-                        }}
-                      >
-                        {gps.datetime}
-                      </Text>
-                      <View style={{ flexDirection: 'row' }}>
-                        <View style={{ flex: 1, paddingLeft: moderateScale(8) }}>
-                          <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: '#4A4B4D' }}>
-                            <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Location:</Text>
-                            {'\n'}
-                            <Text style={{ fontFamily: 'Poppins-Regular' }}>{gps.lokasi}</Text>
-                          </Text>
-                          {gps.substate === 'Park' && gps.state === 'On' && (
-                            <Text style={{ fontSize: 12, color: '#4A4B4D' }}>
-                              <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Parking Duration: </Text>
-                              <Text style={{ fontFamily: 'Poppins-Regular', color: '#F44336' }}>
-                                {gps.parkingDuration || 'N/A'}
+                              <View
+                                style={[
+                                  styles.colorIndicator,
+                                  { backgroundColor: darkenHexColor(getColorFromSubstate(gps.substate, gps.state) ?? '#F44336', 0.8, 0.93) },
+                                ]}
+                              />
+                              <Text
+                                style={{
+                                  fontFamily: 'Poppins-SemiBold',
+                                  fontSize: 12,
+                                  top: moderateScale(2),
+                                  color: '#ffffffff',
+                                }}
+                              >
+                                {gps.state === 'On' ? gps.substate : gps.state}
                               </Text>
-                            </Text>
-                          )}
-                        </View>
-                        <View style={{ paddingLeft: moderateScale(12), alignSelf: 'flex-start' }}>
-                          {gps.substate === 'Move' && gps.state === 'On' && (
-                            <View>
-                              <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 12, textAlign: 'center' }}>{`Speed:`}</Text>
-                              <View style={styles.sectionWrapper}>
-                                <RandySpeedometer
-                                  data={getSpeedometerData(gps.kecepatan)}
-                                  strokeWidth={6}
-                                  radius={moderateScale(25)}
-                                  containerWidth={moderateScale(70)}
-                                  containerHeight={moderateScale(70)}
-                                  type="round"
-                                  startAngle={270}
-                                  endAngle={90}
-                                  animationType="slide"
-                                  shouldAnimate={isSelected}
-                                />
+                            </View>
+                            <View
+                              style={[
+                                styles.vehiclePlate,
+                                {
+                                  borderLeftColor: darkenHexColor(getColorFromSubstate(gps.substate, gps.state) ?? '#F44336', 0.8, 0.93),
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={{
+                                  fontFamily: 'Poppins-SemiBold',
+                                  fontSize: 12,
+                                  top: moderateScale(2),
+                                  color: '#4A4B4D',
+                                }}
+                              >
+                                {gps.nopol}
+                              </Text>
+                            </View>
+                          </View>
+                          <View>
+                            <View style={{ flexDirection: 'row' }}>
+                              <View style={{ marginBottom: moderateScale(12), alignSelf: 'center' }}>
+                                <RandyBatteryIcon color="#4A4B4D" size={moderateScale(24)} percentage={gps.batteryLevel} />
                               </View>
+                              <TouchableOpacity style={{ marginBottom: moderateScale(12) }}>
+                                <RandyIcon name="StreetView" color="#4A4B4D" size={moderateScale(28)} />
+                              </TouchableOpacity>
+                              <TouchableOpacity style={{ marginBottom: moderateScale(12) }}>
+                                <RandyIcon name="Edit" color="#4A4B4D" size={moderateScale(28)} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                        <Text
+                          style={{
+                            fontFamily: 'Poppins-SemiBold',
+                            fontSize: 12,
+                            color: '#4A4B4D',
+                            paddingLeft: moderateScale(8),
+                          }}
+                        >
+                          {gps.datetime}
+                        </Text>
+                        <View style={{ flexDirection: 'row' }}>
+                          <View style={{ flex: 1, paddingLeft: moderateScale(8) }}>
+                            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: '#4A4B4D' }}>
+                              <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Location:</Text>
+                              {'\n'}
+                              <Text style={{ fontFamily: 'Poppins-Regular' }}>{gps.lokasi}</Text>
+                            </Text>
+                            {gps.substate === 'Park' && gps.state === 'On' && (
+                              <Text style={{ fontSize: 12, color: '#4A4B4D' }}>
+                                <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Parking Duration: </Text>
+                                <Text style={{ fontFamily: 'Poppins-Regular', color: '#F44336' }}>
+                                  {gps.parkingDuration || 'N/A'}
+                                </Text>
+                              </Text>
+                            )}
+                          </View>
+                          <View style={{ paddingLeft: moderateScale(12), alignSelf: 'flex-start' }}>
+                            {gps.substate === 'Move' && gps.state === 'On' && (
+                              <View>
+                                <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 12, textAlign: 'center' }}>{`Speed:`}</Text>
+                                <View style={styles.sectionWrapper}>
+                                  <RandySpeedometer
+                                    data={getSpeedometerData(gps.kecepatan)}
+                                    strokeWidth={6}
+                                    radius={moderateScale(25)}
+                                    containerWidth={moderateScale(70)}
+                                    containerHeight={moderateScale(70)}
+                                    type="round"
+                                    startAngle={270}
+                                    endAngle={90}
+                                    animationType="slide"
+                                    shouldAnimate={isSelected}
+                                  />
+                                </View>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingHorizontal: moderateScale(8),
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: '#4A4B4D', paddingRight: moderateScale(6) }}>
+                              <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Mileage: </Text>
+                              <Text style={{ fontFamily: 'Poppins-Regular' }}>{gps.mileage} km</Text>
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#4A4B4D' }}>
+                              <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Odo: </Text>
+                              <Text style={{ fontFamily: 'Poppins-Regular' }}>{gps.odometer} km</Text>
+                            </Text>
+                          </View>
+                          {gps.rented && (
+                            <View>
+                              <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: '#F44336' }}>Is Rented</Text>
                             </View>
                           )}
                         </View>
                       </View>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: moderateScale(8),
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 12, color: '#4A4B4D', paddingRight: moderateScale(6) }}>
-                            <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Mileage: </Text>
-                            <Text style={{ fontFamily: 'Poppins-Regular' }}>{gps.mileage} km</Text>
-                          </Text>
-                          <Text style={{ fontSize: 12, color: '#4A4B4D' }}>
-                            <Text style={{ fontFamily: 'Poppins-SemiBold' }}>Odo: </Text>
-                            <Text style={{ fontFamily: 'Poppins-Regular' }}>{gps.odometer} km</Text>
-                          </Text>
-                        </View>
-                        {gps.rented && (
-                          <View>
-                            <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: '#F44336' }}>Is Rented</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                )}
-                scrollEnabled={false}
-                initialNumToRender={10}
-                maxToRenderPerBatch={10}
-                windowSize={5}
-              />
-            )}
-
-          </View>) : null}
+                    </Animated.View>
+                  )}
+                  scrollEnabled={false}
+                  estimatedItemSize={120}
+                />
+              )}
+            </View>) : null}
+        </View>
       </View>
-    </View>
-  );
+    );
+  }
   {/********** RENDER ITEM FLATLIST **********/ }
 
   {/********** RENDER UTAMA **********/ }
@@ -475,7 +537,7 @@ export default function GPS() {
 
               {UsersSearchText !== '' ? (
                 <>
-                  <View style={{ backgroundColor: '#e4e4e4ff', borderRadius: moderateScale(10), paddingVertical: moderateScale(8), paddingRight: moderateScale(48), paddingLeft: moderateScale(8), left: moderateScale(42), top: moderateScale(-5), flexDirection: 'row', alignItems: 'center' }}>
+                  <Animated.View entering={FadeInRight} exiting={FadeOutRight} layout={LinearTransition.springify().damping(16)} style={{ backgroundColor: '#e4e4e4ff', borderRadius: moderateScale(10), paddingVertical: moderateScale(8), paddingRight: moderateScale(48), paddingLeft: moderateScale(8), left: moderateScale(42), top: moderateScale(-5), flexDirection: 'row', alignItems: 'center' }}>
                     <TouchableOpacity style={{ paddingRight: moderateScale(4) }} onPress={() => { setUsersSearchText(''); }}>
                       <RandyIcon
                         name="Close"
@@ -484,7 +546,7 @@ export default function GPS() {
                       />
                     </TouchableOpacity>
                     <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, top: moderateScale(1.5) }}>{UsersSearchText.length > 8 ? `${UsersSearchText.slice(0, 8)}...` : UsersSearchText}</Text>
-                  </View>
+                  </Animated.View>
                   <TouchableOpacity
                     style={{ alignItems: 'center', marginBottom: moderateScale(12) }}
                     onPress={() => { setSearchActive(true); setChoosenStateIndex(0); setDeactivatedState(false); }}
@@ -532,7 +594,7 @@ export default function GPS() {
         </ScrollView>
       </View>
       <View style={{ flex: 1, paddingBottom: insets.bottom }}>
-        <CustomFlatList
+        <CustomFlashList
           data={filteredData}
           renderItem={renderItemMemo}
           dynamicTouchable={true}
@@ -540,6 +602,7 @@ export default function GPS() {
           onSelectItem={handleSelectItem}
           listStyle={{ minWidth: '100%', marginVertical: moderateScale(16) }}
           listViewStyle={styles.ListItemInfo}
+          extraData={[selectedIndex]}
         />
       </View>
     </View>

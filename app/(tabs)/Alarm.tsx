@@ -49,15 +49,6 @@ export default function Alarm() {
 
   {/********** FUNGSI LAIN - LAIN **********/ }
 
-  function flattenUserGPS(data: ItemTypeGPSData[]) {
-    return data.flatMap(user =>
-      (user.userGPS || []).map(gps => ({
-        ...gps,
-        user: user.user, // tambahkan info user
-      }))
-    );
-  }
-
   const getColorFromSubstate = (substate: string, state: string) => {
     switch (state) {
       case 'On':

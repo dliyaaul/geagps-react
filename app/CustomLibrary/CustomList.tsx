@@ -1,5 +1,7 @@
+import { FlashList } from "@shopify/flash-list";
 import React from 'react';
-import { FlatList, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import Animated, { FadeInLeft } from "react-native-reanimated";
 import { ScaledSheet } from 'react-native-size-matters';
 
 type CustomFlatListProps<T> = {
@@ -12,9 +14,10 @@ type CustomFlatListProps<T> = {
   onSelectItem?: (index: number) => void;
   listStyle?: object;
   listViewStyle?: object;
+  extraData?: any;
 };
 
-function CustomFlatList<T>({
+function CustomFlashList<T>({
   data,
   renderItem,
   Touchable = false,
@@ -24,44 +27,45 @@ function CustomFlatList<T>({
   onSelectItem,
   listStyle = {},
   listViewStyle = {},
+  extraData,
 }: CustomFlatListProps<T>) {
   return (
-    <FlatList
-      style={{ ...listStyle }}
-      data={data}
-      renderItem={({ item, index }) => (
-        <View style={{...listViewStyle }}>
-          {Touchable ? (
-            <TouchableOpacity onPress={() => {
-              onSelectItem && onSelectItem(index);
-              onPressMore && onPressMore(index);
-            }}>
-              {renderItem(item, selectedIndex === index, index)}
-            </TouchableOpacity>
-          ) : dynamicTouchable ? (
-            selectedIndex !== index ? (
+    <View style={{ ...listStyle }}>
+      <FlashList
+        data={data}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInLeft} style={{ ...listViewStyle }}>
+            {Touchable ? (
               <TouchableOpacity onPress={() => {
-                onSelectItem && onSelectItem(index);
-                onPressMore && onPressMore(index);
+                onSelectItem && onSelectItem(index + 1);
+                onPressMore && onPressMore(index + 1);
               }}>
-                {renderItem(item, selectedIndex === index, index)}
+                {renderItem(item, selectedIndex === index + 1, index + 1)}
               </TouchableOpacity>
+            ) : dynamicTouchable ? (
+              selectedIndex !== index + 1 ? (
+                <TouchableOpacity onPress={() => {
+                  onSelectItem && onSelectItem(index + 1);
+                  onPressMore && onPressMore(index + 1);
+                }}>
+                  {renderItem(item, selectedIndex === index + 1, index + 1)}
+                </TouchableOpacity>
+              ) : (
+                <View>
+                  {renderItem(item, selectedIndex === index + 1, index + 1)}
+                </View>
+              )
             ) : (
-              <View>
-                {renderItem(item, selectedIndex === index, index)}
-              </View>
-            )
-          ) : (
-            <TouchableWithoutFeedback>{renderItem(item, selectedIndex === index, index)}</TouchableWithoutFeedback>
-          )}
-        </View>
-      )}
-      keyExtractor={(item, index) => index.toString()}
-      initialNumToRender={10}
-      maxToRenderPerBatch={10}
-      windowSize={5}
-      showsVerticalScrollIndicator={false} 
-    />
+              <TouchableWithoutFeedback>{renderItem(item, selectedIndex === index + 1, index + 1)}</TouchableWithoutFeedback>
+            )}
+          </Animated.View>
+        )}
+        keyExtractor={(item, index) => (index + 1).toString()}
+        showsVerticalScrollIndicator={false}
+        estimatedItemSize={80}
+        extraData={extraData}  // Menambahkan data.length sebagai extraData
+      />
+    </View>
   );
 }
 
@@ -82,4 +86,4 @@ const styles = ScaledSheet.create({
   },
 });
 
-export default CustomFlatList;
+export default CustomFlashList;

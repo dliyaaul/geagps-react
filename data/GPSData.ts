@@ -159,6 +159,38 @@ export const DataGPS: ItemTypeGPSData[] = [
       },
     ],
   },
+    {
+    id: 3,
+    user: 'BudiSpeed',
+    userGPS: [
+      {
+        state: 'On',
+        nopol: 'W 4769 KN',
+        datetime: '2024-06-10 10:15',
+        kecepatan: 45,
+        lokasi: 'Jl. Pemuda No. 1, RT.9/RW.7, Rawamangun, Kec. Pulo Gadung, Kota Jakarta Timur, Daerah Khusus Ibukota Jakarta 13220',
+        odometer: 18000,
+        rented: false,
+        substate: 'Move',
+        mileage: 110,
+        parkingDuration: '',
+        batteryLevel: 95,
+      },
+      {
+        state: 'On',
+        nopol: 'L 9101 PP',
+        datetime: '2024-06-10 14:00',
+        kecepatan: 30,
+        lokasi: 'Jl. Medan Merdeka Barat No. 3, RT.2/RW.3, Gambir, Kec. Gambir, Kota Jakarta Pusat, Daerah Khusus Ibukota Jakarta 10110',
+        odometer: 18200,
+        rented: true,
+        substate: 'Park',
+        mileage: 70,
+        parkingDuration: '1h 10m',
+        batteryLevel: 20,
+      },
+    ],
+  },
 ];
 
 export function CountStatus(data: ItemTypeGPSData[], status: string) {
@@ -199,4 +231,12 @@ export function CountStatusByName(data: ItemTypeGPSData[], status: string, UserN
 
 export function CountAll(data: ItemTypeGPSData[]) {
   return data.reduce((total, user) => total + (user.userGPS ? user.userGPS.length : 0), 0);
+}
+
+export function CountAllByName(data: ItemTypeGPSData[], UserName: string) {
+  const filteredData = UserName
+    ? data.filter(user => user.user.toLowerCase() === UserName.toLowerCase())
+    : data;
+
+  return filteredData.reduce((total, user) => total + (user.userGPS ? user.userGPS.length : 0), 0);
 }
